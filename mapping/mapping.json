@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "managed_tag": { "key": "managed-by", "value": "henz-iga" },
+  "mappings": [
+    {
+      "group": "AWS-IT-ReadOnly",
+      "permission_set": {
+        "name": "Henz-IT-ReadOnly",
+        "description": "Read-only access for IT staff. Managed by the henz-iga automation; do not edit by hand.",
+        "session_duration": "PT8H",
+        "managed_policies": ["arn:aws:iam::aws:policy/ReadOnlyAccess"]
+      }
+    }
+  ]
+}
