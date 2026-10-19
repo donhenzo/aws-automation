@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 
 import boto3
 
@@ -30,7 +31,11 @@ def handler(event, context):
     if not instances:
         raise RuntimeError("No IAM Identity Center instance found in this region")
     instance = instances[0]
-    account_id = boto3.client("sts").get_caller_identity()["Account"]
+    # The account that permission sets are assigned on. Set by Terraform; falls back to this account.
+    target = os.environ.get("TARGET_ACCOUNT_ID", "").strip()
+    if target and not re.fullmatch(r"\d{12}", target):
+        raise RuntimeError("TARGET_ACCOUNT_ID must be a 12-digit AWS account ID")
+    account_id = target or boto3.client("sts").get_caller_identity()["Account"]
 
     reconciler = Reconciler(
         sso_admin=sso_admin,
@@ -53,4 +58,7 @@ def handler(event, context):
         "warnings": sum(1 for f in findings if f["severity"] == "warning"),
     }
     logger.info(json.dumps(summary))
+    if summary["errors"]:
+        # Fail the invocation so the Errors alarm fires. Every finding is already in the logs.
+        raise RuntimeError(f"{summary['errors']} error finding(s); see the logs for details")
     return summary
