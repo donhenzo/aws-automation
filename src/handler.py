@@ -47,8 +47,9 @@ def handler(event, context):
         dry_run=dry_run,
     )
     findings = reconciler.run()
+    levels = {"error": logging.ERROR, "warning": logging.WARNING}
     for finding in findings:
-        logger.info(json.dumps(finding))
+        logger.log(levels.get(finding["severity"], logging.INFO), json.dumps(finding))
 
     summary = {
         "code": "RUN_SUMMARY",

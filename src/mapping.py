@@ -41,6 +41,7 @@ class MappingFile:
     managed_tag_key: str
     managed_tag_value: str
     mappings: tuple[Mapping, ...]
+    watch_prefix: str = ""  # groups starting with this but missing from the file get a warning
 
 
 def _nonempty_str(value: object) -> bool:
@@ -147,9 +148,14 @@ def parse_mapping(doc: object) -> MappingFile:
             entries.append(entry)
     _check_one_to_one(entries, problems)
 
+    watch = doc.get("watch_group_prefix", "")
+    if not isinstance(watch, str) or len(watch) > 64:
+        problems.append("watch_group_prefix must be a string of at most 64 characters")
+        watch = ""
+
     if problems:
         raise MappingError(problems)
-    return MappingFile(tag_key, tag_value, tuple(entries))
+    return MappingFile(tag_key, tag_value, tuple(entries), watch)
 
 
 def load_mapping(path: str | Path) -> MappingFile:

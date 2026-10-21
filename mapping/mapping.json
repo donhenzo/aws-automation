@@ -1,6 +1,7 @@
 {
   "version": 1,
   "managed_tag": { "key": "managed-by", "value": "henz-iga" },
+  "watch_group_prefix": "AWS-IT-",
   "mappings": [
     {
       "group": "AWS-IT-ReadOnly",
@@ -9,6 +10,24 @@
         "description": "Read-only access for IT staff. Managed by the henz-iga automation; do not edit by hand.",
         "session_duration": "PT8H",
         "managed_policies": ["arn:aws:iam::aws:policy/ReadOnlyAccess"]
+      }
+    },
+    {
+      "group": "AWS-IT-PowerUsers",
+      "permission_set": {
+        "name": "Henz-IT-PowerUsers",
+        "description": "Power user access for IT engineers. Managed by the henz-iga automation; do not edit by hand.",
+        "session_duration": "PT4H",
+        "managed_policies": ["arn:aws:iam::aws:policy/PowerUserAccess"]
+      }
+    },
+    {
+      "group": "AWS-IT-Security",
+      "permission_set": {
+        "name": "Henz-IT-Security",
+        "description": "Security audit access for the security team. Managed by the henz-iga automation; do not edit by hand.",
+        "session_duration": "PT8H",
+        "managed_policies": ["arn:aws:iam::aws:policy/SecurityAudit"]
       }
     }
   ]

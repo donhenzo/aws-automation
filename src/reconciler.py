@@ -54,6 +54,7 @@ class Reconciler:
         self._poll_seconds = poll_seconds
         self.findings: list[dict[str, Any]] = []
 
+    # ------------------------------------------------------------------ public
 
     def run(self) -> list[dict[str, Any]]:
         self.findings = []
@@ -68,7 +69,31 @@ class Reconciler:
                 self._reconcile_group(entry, by_name)
             except Exception as exc:  # one group failing must not block the others
                 self._add(1, "error", "UNEXPECTED_ERROR", entry.group, f"{_error_code(exc)}: {exc}")
+        self._report_unmapped()
         return self.findings
+
+    def _report_unmapped(self) -> None:
+        """Warn about groups that look like ours (watched prefix) but are not in the mapping file.
+        This is what turns a mistyped or forgotten group from silent into visible."""
+        prefix = self.mapping.watch_prefix
+        if not prefix:
+            return
+        mapped = {m.group for m in self.mapping.mappings}
+        try:
+            names = [
+                g.get("DisplayName") or ""
+                for g in self._paginate(self.ids.list_groups, "Groups", IdentityStoreId=self.identity_store_id)
+            ]
+        except Exception as exc:
+            self._add(1, "error", "UNMAPPED_CHECK_FAILED", "*", f"{_error_code(exc)}: {exc}")
+            return
+        for name in sorted(names):
+            if name.startswith(prefix) and name not in mapped:
+                self._add(1, "warning", "UNMAPPED_GROUP", name,
+                          f"Group {name!r} starts with the watched prefix {prefix!r} but is not in the mapping "
+                          "file, so it receives no access. Add a rule, or fix the group name.")
+
+    # --------------------------------------------------------------- one group
 
     def _reconcile_group(self, entry: Mapping, by_name: dict[str, str]) -> None:
         group_id = self._group_id(entry.group)
@@ -96,7 +121,7 @@ class Reconciler:
         self._ensure_policies(entry, ps_arn, preexisting)
         self._ensure_assignment(entry, ps_arn, group_id)
 
-    # permission set
+    # ------------------------------------------------------------- permission set
 
     def _create_permission_set(self, entry: Mapping) -> str:
         kwargs: dict[str, Any] = {
@@ -143,7 +168,7 @@ class Reconciler:
                       f"Policies on {entry.permission_set_name} that the file does not declare: {', '.join(extra)}. "
                       "Reported only; auto-revert is a later phase.")
 
-    # assignment
+    # ------------------------------------------------------------------ assignment
 
     def _assignment_exists(self, ps_arn: str, group_id: str) -> bool:
         return any(
@@ -196,7 +221,7 @@ class Reconciler:
                 self._sleep(self._poll_seconds)
         return status, reason
 
-    # lookups
+    # --------------------------------------------------------------------- lookups
 
     def _group_id(self, name: str) -> str | None:
         try:
@@ -225,7 +250,7 @@ class Reconciler:
             for t in tags
         )
 
-    # helpers
+    # --------------------------------------------------------------------- helpers
 
     @staticmethod
     def _paginate(fn: Callable[..., dict], key: str, **kwargs: Any) -> Iterator[Any]:
