@@ -36,7 +36,7 @@ locals {
   alarm_actions = aws_sns_topic.alerts[*].arn
 }
 
-# ------------------------------------------------------------------ package the code
+# package the code
 # The mapping file ships inside the function, so a change to it is a reviewed, versioned deploy.
 data "archive_file" "lambda" {
   type        = "zip"
@@ -60,13 +60,13 @@ data "archive_file" "lambda" {
   }
 }
 
-# ---------------------------------------------------------------------------- logs
+#logs
 resource "aws_cloudwatch_log_group" "lambda" {
   name              = "/aws/lambda/${local.function_name}"
   retention_in_days = 30
 }
 
-# ---------------------------------------------------------------------------- role
+# role
 data "aws_iam_policy_document" "assume" {
   statement {
     actions = ["sts:AssumeRole"]
@@ -135,7 +135,7 @@ resource "aws_iam_role_policy" "lambda" {
   policy = data.aws_iam_policy_document.lambda.json
 }
 
-# -------------------------------------------------------------------------- function
+# function
 resource "aws_lambda_function" "reconciler" {
   function_name    = local.function_name
   description      = "henz-iga reconciler, built from commit ${var.git_sha}"
@@ -171,7 +171,7 @@ resource "aws_lambda_function_event_invoke_config" "reconciler" {
   maximum_retry_attempts = 0
 }
 
-# -------------------------------------------------------------------------- schedule
+# schedule
 resource "aws_cloudwatch_event_rule" "schedule" {
   name                = "${local.function_name}-schedule"
   schedule_expression = var.schedule_expression
@@ -191,7 +191,7 @@ resource "aws_lambda_permission" "events" {
   source_arn    = aws_cloudwatch_event_rule.schedule.arn
 }
 
-# --------------------------------------------------------------------------- alerts
+# alerts
 resource "aws_sns_topic" "alerts" {
   count = var.alert_email == "" ? 0 : 1
   name  = "${local.function_name}-alerts"
