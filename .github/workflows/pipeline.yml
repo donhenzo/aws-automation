@@ -1,0 +1,148 @@
+name: pipeline
+
+# Pull request  -> tests, checks, security scan, and a terraform plan posted on the PR.
+# Merge to main -> the same checks, then an approved terraform apply and a smoke test.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pytest
+      - name: Unit tests
+        run: python -m pytest -q
+      - name: Mapping file is valid and 1:1
+        run: python scripts/validate_mapping.py
+
+  terraform-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.16"
+          terraform_wrapper: false
+      - name: Format (informational for now)
+        run: terraform fmt -check -recursive -diff
+        continue-on-error: true
+      - name: Validate infra
+        working-directory: infra
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+      - name: Validate bootstrap
+        working-directory: bootstrap
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install checkov
+      - name: Checkov (informational for now)
+        run: checkov -d infra -d bootstrap --quiet --compact --soft-fail
+
+  plan:
+    if: github.event_name == 'pull_request'
+    needs: [test, terraform-checks]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+    env:
+      TF_VAR_dry_run: "false"
+      TF_VAR_schedule_enabled: "true"
+      TF_VAR_target_account_id: ${{ vars.TARGET_ACCOUNT_ID }}
+      TF_VAR_git_sha: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
+          aws-region: eu-north-1
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.16"
+          terraform_wrapper: false
+      - name: Terraform plan
+        working-directory: infra
+        shell: bash
+        run: |
+          terraform init -input=false -backend-config="bucket=${{ vars.STATE_BUCKET }}"
+          terraform plan -input=false -no-color -lock=false | tee plan.txt
+      - name: Post the plan on the pull request
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = 'infra/plan.txt';
+            let plan = fs.existsSync(path) ? fs.readFileSync(path, 'utf8') : '(no plan output)';
+            if (plan.length > 60000) plan = plan.slice(-60000);
+            const body = '### Terraform plan\n```\n' + plan + '\n```';
+            await github.rest.issues.createComment({
+              ...context.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [test, terraform-checks]
+    runs-on: ubuntu-latest
+    environment: production        # needs your approval before this job starts
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      TF_VAR_dry_run: "false"
+      TF_VAR_schedule_enabled: "true"
+      TF_VAR_target_account_id: ${{ vars.TARGET_ACCOUNT_ID }}
+      TF_VAR_git_sha: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_APPLY_ROLE_ARN }}
+          aws-region: eu-north-1
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.16"
+          terraform_wrapper: false
+      - name: Terraform plan
+        working-directory: infra
+        run: |
+          terraform init -input=false -backend-config="bucket=${{ vars.STATE_BUCKET }}"
+          terraform plan -input=false -no-color -out=tfplan
+      - name: Terraform apply
+        working-directory: infra
+        run: terraform apply -input=false -no-color tfplan
+      - name: Smoke test (invoke the function once)
+        run: |
+          aws lambda invoke --function-name henz-iga-reconciler --region eu-north-1 \
+            --cli-binary-format raw-in-base64-out --payload '{}' response.json > invoke.json
+          cat invoke.json response.json
+          if grep -q FunctionError invoke.json; then
+            echo "Smoke test failed: the function reported an error"
+            exit 1
+          fi

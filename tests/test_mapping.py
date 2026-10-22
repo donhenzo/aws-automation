@@ -39,8 +39,9 @@ def problems_for(doc):
 
 def test_real_mapping_file_is_valid():
     mapping = load_mapping(REAL_FILE)
-    assert [m.group for m in mapping.mappings] == ["AWS-IT-ReadOnly"]
+    assert [m.group for m in mapping.mappings] == ["AWS-IT-ReadOnly", "AWS-IT-PowerUsers", "AWS-IT-Security"]
     assert mapping.mappings[0].permission_set_name == "Henz-IT-ReadOnly"
+    assert mapping.watch_prefix == "AWS-IT-"
 
 
 def test_good_document_parses():
@@ -146,3 +147,15 @@ def test_load_reads_a_valid_file(tmp_path):
     good = tmp_path / "mapping.json"
     good.write_text(json.dumps(GOOD))
     assert load_mapping(good).mappings[0].group == "AWS-IT-ReadOnly"
+
+
+def test_watch_prefix_is_optional_and_defaults_to_empty():
+    assert parse_mapping(GOOD).watch_prefix == ""
+
+
+def test_watch_prefix_is_read():
+    assert parse_mapping(variant(lambda d: d.update(watch_group_prefix="AWS-IT-"))).watch_prefix == "AWS-IT-"
+
+
+def test_rejects_non_string_watch_prefix():
+    assert any("watch_group_prefix" in p for p in problems_for(variant(lambda d: d.update(watch_group_prefix=5))))

@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.5"
+  required_version = ">= 1.10"
 
   required_providers {
     aws = {
@@ -138,6 +138,8 @@ resource "aws_iam_role_policy" "lambda" {
 # -------------------------------------------------------------------------- function
 resource "aws_lambda_function" "reconciler" {
   function_name    = local.function_name
+  description      = "henz-iga reconciler, built from commit ${var.git_sha}"
+  publish          = true # every code change becomes a numbered, immutable version
   role             = aws_iam_role.lambda.arn
   runtime          = "python3.12"
   handler          = "handler.handler"

@@ -28,6 +28,9 @@ class FakeIdentityStore:
             raise FakeClientError("ResourceNotFoundException")
         return {"GroupId": self.groups[name]}
 
+    def list_groups(self, IdentityStoreId, NextToken=None):
+        return {"Groups": [{"DisplayName": n, "GroupId": i} for n, i in self.groups.items()]}
+
 
 class FakeSSO:
     def __init__(self):
@@ -108,6 +111,12 @@ def mapping_doc(*groups):
             for g, ps in groups
         ],
     }
+
+
+def with_prefix(doc, prefix="AWS-IT-"):
+    doc = copy.deepcopy(doc)
+    doc["watch_group_prefix"] = prefix
+    return doc
 
 
 def make(sso, ids, doc, dry_run=False):
@@ -270,3 +279,39 @@ def test_unexpected_identity_store_error_is_reported_not_swallowed():
     findings = make(FakeSSO(), BrokenStore(), mapping_doc(("AWS-IT-ReadOnly", "Henz-IT-ReadOnly"))).run()
     assert codes(findings) == ["UNEXPECTED_ERROR"]
     assert "AccessDeniedException" in findings[0]["message"]
+
+
+# ------------------------------------------------------------ unmapped group visibility
+
+def test_unmapped_group_with_watched_prefix_is_reported_as_a_warning():
+    sso = FakeSSO()
+    ids = FakeIdentityStore({"AWS-IT-ReadOnly": "grp-1", "AWS-IT-Typo": "grp-2", "Other-Group": "grp-3"})
+    doc = with_prefix(mapping_doc(("AWS-IT-ReadOnly", "Henz-IT-ReadOnly")))
+    findings = make(sso, ids, doc).run()
+    unmapped = [f for f in findings if f["code"] == "UNMAPPED_GROUP"]
+    assert [f["group"] for f in unmapped] == ["AWS-IT-Typo"]  # not the mapped one, not the other prefix
+    assert unmapped[0]["severity"] == "warning"
+
+
+def test_case_typo_in_group_name_is_reported_not_silently_ignored():
+    ids = FakeIdentityStore({"AWS-IT-readonly": "grp-1"})
+    doc = with_prefix(mapping_doc(("AWS-IT-ReadOnly", "Henz-IT-ReadOnly")))
+    findings = make(FakeSSO(), ids, doc).run()
+    assert "UNMAPPED_GROUP" in codes(findings)
+
+
+def test_no_prefix_means_no_unmapped_check():
+    ids = FakeIdentityStore({"AWS-IT-Typo": "grp-2"})
+    findings = make(FakeSSO(), ids, mapping_doc(("AWS-IT-ReadOnly", "Henz-IT-ReadOnly"))).run()
+    assert "UNMAPPED_GROUP" not in codes(findings)
+
+
+def test_unmapped_check_failure_is_an_error_not_silence():
+    class NoListStore(FakeIdentityStore):
+        def list_groups(self, **kwargs):
+            raise FakeClientError("AccessDeniedException")
+
+    doc = with_prefix(mapping_doc(("AWS-IT-ReadOnly", "Henz-IT-ReadOnly")))
+    findings = make(FakeSSO(), NoListStore(), doc).run()
+    failed = [f for f in findings if f["code"] == "UNMAPPED_CHECK_FAILED"]
+    assert failed and failed[0]["severity"] == "error"
