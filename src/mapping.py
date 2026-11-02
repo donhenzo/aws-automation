@@ -34,6 +34,7 @@ class Mapping:
     description: str
     session_duration: str
     managed_policies: tuple[str, ...]
+    justification: str = ""  # required when a privileged policy is used (checked against the allow-list)
 
 
 @dataclass(frozen=True)
@@ -48,12 +49,17 @@ def _nonempty_str(value: object) -> bool:
     return isinstance(value, str) and value.strip() != ""
 
 
-def _duration_ok(value: str) -> bool:
+def duration_minutes(value: str) -> int | None:
+    """Length of an ISO 8601 session such as PT8H or PT1H30M, in minutes. None if not valid."""
     match = DURATION_RE.match(value)
     if not match:
-        return False
-    minutes = int(match.group("h") or 0) * 60 + int(match.group("m") or 0)
-    return 60 <= minutes <= 720
+        return None
+    return int(match.group("h") or 0) * 60 + int(match.group("m") or 0)
+
+
+def _duration_ok(value: str) -> bool:
+    minutes = duration_minutes(value)
+    return minutes is not None and 60 <= minutes <= 720
 
 
 def _parse_entry(where: str, item: object, problems: list[str]) -> Mapping | None:
@@ -93,6 +99,10 @@ def _parse_entry(where: str, item: object, problems: list[str]) -> Mapping | Non
     if len(set(policies)) != len(policies):
         problems.append(f"{where}.permission_set.managed_policies: contains duplicates")
 
+    justification = ps.get("justification", "")
+    if not isinstance(justification, str) or len(justification) > 250:
+        problems.append(f"{where}.permission_set.justification: must be a string of at most 250 characters")
+
     if len(problems) > start:
         return None
     return Mapping(
@@ -101,6 +111,7 @@ def _parse_entry(where: str, item: object, problems: list[str]) -> Mapping | Non
         description=description,
         session_duration=duration,
         managed_policies=tuple(policies),
+        justification=justification.strip(),
     )
 
 

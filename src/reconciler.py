@@ -130,11 +130,15 @@ class Reconciler:
             "SessionDuration": entry.session_duration,
             "Tags": [{"Key": self.mapping.managed_tag_key, "Value": self.mapping.managed_tag_value}],
         }
-        if entry.description:
-            kwargs["Description"] = entry.description
+        description = entry.description
+        if entry.justification:  # privileged rules carry their reason in the permission set itself
+            description = f"{description} Justification: {entry.justification}".strip()
+        if description:
+            kwargs["Description"] = description[:700]  # AWS limit
         arn = self.sso.create_permission_set(**kwargs)["PermissionSet"]["PermissionSetArn"]
+        note = f" Justification: {entry.justification}" if entry.justification else ""
         self._add(2, "info", "PERMISSION_SET_CREATED", entry.group,
-                  f"Created permission set {entry.permission_set_name}.", "created")
+                  f"Created permission set {entry.permission_set_name}.{note}", "created")
         return arn
 
     def _ensure_policies(self, entry: Mapping, ps_arn: str, preexisting: bool) -> None:
