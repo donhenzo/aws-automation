@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from mapping import MappingError, load_mapping, parse_mapping
+from mapping import MappingError, duration_minutes, load_mapping, parse_mapping
 
 REAL_FILE = Path(__file__).resolve().parents[1] / "mapping" / "mapping.json"
 
@@ -159,3 +159,19 @@ def test_watch_prefix_is_read():
 
 def test_rejects_non_string_watch_prefix():
     assert any("watch_group_prefix" in p for p in problems_for(variant(lambda d: d.update(watch_group_prefix=5))))
+
+
+def test_duration_minutes():
+    assert duration_minutes("PT8H") == 480
+    assert duration_minutes("PT1H30M") == 90
+    assert duration_minutes("8H") is None
+
+
+def test_justification_is_read_and_trimmed():
+    doc = variant(lambda d: d["mappings"][0]["permission_set"].update(justification="  Because  "))
+    assert parse_mapping(doc).mappings[0].justification == "Because"
+
+
+def test_rejects_too_long_justification():
+    doc = variant(lambda d: d["mappings"][0]["permission_set"].update(justification="x" * 251))
+    assert any("justification" in p for p in problems_for(doc))

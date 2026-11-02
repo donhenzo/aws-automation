@@ -76,7 +76,7 @@ class FakeSSO:
             raise RuntimeError("simulated AWS outage")
         self._counter += 1
         arn = f"arn:aws:sso:::permissionSet/ssoins-1111/ps-{self._counter}"
-        self.permission_sets[arn] = {"Name": Name, "Tags": list(Tags), "Policies": set()}
+        self.permission_sets[arn] = {"Name": Name, "Tags": list(Tags), "Policies": set(), "Description": Description}
         return {"PermissionSet": {"PermissionSetArn": arn}}
 
     def attach_managed_policy_to_permission_set(self, InstanceArn, PermissionSetArn, ManagedPolicyArn):
@@ -315,3 +315,26 @@ def test_unmapped_check_failure_is_an_error_not_silence():
     findings = make(FakeSSO(), NoListStore(), doc).run()
     failed = [f for f in findings if f["code"] == "UNMAPPED_CHECK_FAILED"]
     assert failed and failed[0]["severity"] == "error"
+
+
+# ----------------------------------------------------------------- justification
+
+def test_justification_is_stored_in_the_permission_set_description_and_the_log():
+    doc = mapping_doc(("AWS-IT-PowerUsers", "Henz-IT-PowerUsers"))
+    doc["mappings"][0]["permission_set"]["justification"] = "Engineers run the lab workloads"
+    sso, ids = FakeSSO(), FakeIdentityStore({"AWS-IT-PowerUsers": "grp-1"})
+    findings = make(sso, ids, doc).run()
+    (ps,) = sso.permission_sets.values()
+    assert "Justification: Engineers run the lab workloads" in ps["Description"]
+    created = [f for f in findings if f["code"] == "PERMISSION_SET_CREATED"][0]
+    assert "Engineers run the lab workloads" in created["message"]
+
+
+def test_description_never_exceeds_the_aws_limit():
+    doc = mapping_doc(("AWS-IT-PowerUsers", "Henz-IT-PowerUsers"))
+    doc["mappings"][0]["permission_set"]["description"] = "d" * 700
+    doc["mappings"][0]["permission_set"]["justification"] = "j" * 250
+    sso, ids = FakeSSO(), FakeIdentityStore({"AWS-IT-PowerUsers": "grp-1"})
+    make(sso, ids, doc).run()
+    (ps,) = sso.permission_sets.values()
+    assert len(ps["Description"]) <= 700

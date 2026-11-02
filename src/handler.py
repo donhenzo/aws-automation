@@ -8,7 +8,8 @@ import re
 
 import boto3
 
-from mapping import MappingError, load_mapping
+from allowlist import load_checked_mapping
+from mapping import MappingError
 from reconciler import Reconciler
 
 logger = logging.getLogger()
@@ -17,10 +18,12 @@ logger.setLevel(logging.INFO)
 
 def handler(event, context):
     dry_run = os.environ.get("DRY_RUN", "true").strip().lower() != "false"
-    path = os.environ.get("MAPPING_PATH", os.path.join(os.path.dirname(__file__), "mapping.json"))
+    here = os.path.dirname(__file__)
+    path = os.environ.get("MAPPING_PATH", os.path.join(here, "mapping.json"))
+    allowlist_path = os.environ.get("ALLOWLIST_PATH", os.path.join(here, "policy-allowlist.json"))
 
     try:
-        mapping = load_mapping(path)
+        mapping = load_checked_mapping(path, allowlist_path)
     except MappingError as exc:
         logger.error(json.dumps({"layer": 1, "severity": "error", "code": "MAPPING_INVALID", "problems": exc.problems}))
         raise  # fail the invocation so the error alarm fires; never run on a bad file

@@ -1,0 +1,28 @@
+{
+  "_readme": [
+    "WHAT THIS FILE IS: the list of AWS managed policies that mapping.json is allowed to attach to a permission set.",
+    "WHY IT EXISTS: without it, anyone who can edit mapping.json could give a group a powerful policy. A policy that is not listed here makes the checks fail in two places: in CI (the pull request cannot pass) and inside the Lambda (the run stops before it touches AWS).",
+    "HOW TO READ AN ENTRY: the key is the policy ARN. 'tier' is 'standard' (normal) or 'privileged' (powerful). A mapping rule that uses a privileged policy must include a written 'justification'. 'max_session_duration' is the longest sign-in session a rule using this policy may ask for (ISO 8601: PT4H means 4 hours). A privileged policy can never allow more than PT4H. 'reason' is why the policy is allowed, for the people reading this file.",
+    "NEVER ALLOWED: policies that control IAM, Organizations or Identity Center themselves (for example IAMFullAccess) are blocked in the code and cannot be allowed here. Listing one makes this whole file invalid.",
+    "HOW TO CHANGE IT: edit on a branch and open a pull request. Treat every new line as a decision to give people more power, and explain it in 'reason'. Adding a policy and using it in mapping.json should be separate, reviewable changes.",
+    "This file is plain JSON, which does not allow comments, so these notes live in the _readme key. The program ignores it."
+  ],
+  "version": 1,
+  "policies": {
+    "arn:aws:iam::aws:policy/ReadOnlyAccess": {
+      "tier": "standard",
+      "max_session_duration": "PT8H",
+      "reason": "View-only access to AWS resources. Cannot change anything."
+    },
+    "arn:aws:iam::aws:policy/SecurityAudit": {
+      "tier": "standard",
+      "max_session_duration": "PT8H",
+      "reason": "Read-only access to security configuration, for the security team."
+    },
+    "arn:aws:iam::aws:policy/PowerUserAccess": {
+      "tier": "privileged",
+      "max_session_duration": "PT4H",
+      "reason": "Lets engineers build and run workloads. Full access except managing IAM users and roles, so sessions are short and each rule must be justified."
+    }
+  }
+}
