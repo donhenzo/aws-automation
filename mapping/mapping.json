@@ -8,7 +8,10 @@
     "This file is plain JSON, which does not allow comments, so these notes live in the _readme key. The program ignores it."
   ],
   "version": 1,
-  "managed_tag": { "key": "managed-by", "value": "henz-iga" },
+  "managed_tag": {
+    "key": "managed-by",
+    "value": "henz-iga"
+  },
   "watch_group_prefix": "AWS-IT-",
   "mappings": [
     {
@@ -17,7 +20,9 @@
         "name": "Henz-IT-ReadOnly",
         "description": "Read-only access for IT staff. Managed by the henz-iga automation; do not edit by hand.",
         "session_duration": "PT8H",
-        "managed_policies": ["arn:aws:iam::aws:policy/ReadOnlyAccess"]
+        "managed_policies": [
+          "arn:aws:iam::aws:policy/ReadOnlyAccess"
+        ]
       }
     },
     {
@@ -27,7 +32,9 @@
         "description": "Power user access for IT engineers. Managed by the henz-iga automation; do not edit by hand.",
         "session_duration": "PT4H",
         "justification": "IT engineers build and run workloads in the lab account. No IAM management.",
-        "managed_policies": ["arn:aws:iam::aws:policy/PowerUserAccess"]
+        "managed_policies": [
+          "arn:aws:iam::aws:policy/PowerUserAccess"
+        ]
       }
     },
     {
@@ -36,7 +43,20 @@
         "name": "Henz-IT-Security",
         "description": "Security audit access for the security team. Managed by the henz-iga automation; do not edit by hand.",
         "session_duration": "PT8H",
-        "managed_policies": ["arn:aws:iam::aws:policy/SecurityAudit"]
+        "managed_policies": [
+          "arn:aws:iam::aws:policy/SecurityAudit"
+        ]
+      }
+    },
+    {
+      "group": "AWS-IT-Admins",
+      "permission_set": {
+        "name": "Henz-IT-Admins",
+        "session_duration": "PT1H",
+        "justification": "Testing that the allow-list blocks this",
+        "managed_policies": [
+          "arn:aws:iam::aws:policy/AdministratorAccess"
+        ]
       }
     }
   ]
