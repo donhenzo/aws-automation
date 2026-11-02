@@ -29,8 +29,6 @@ locals {
   account_id       = data.aws_caller_identity.current.account_id
   prefix           = var.name_prefix
   state_bucket_arn = "arn:aws:s3:::${var.state_bucket}"
-  # How GitHub names this repository inside its OIDC token. AWS compares it exactly.
-  subject_repo = var.github_subject_repo != "" ? var.github_subject_repo : var.github_repo
 }
 
 # GitHub proves who it is with a short-lived token; AWS checks it against this provider.
@@ -41,7 +39,7 @@ resource "aws_iam_openid_connect_provider" "github" {
   thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
 }
 
-# ------------------------------------------------------------------ plan role (read only)
+# plan role (read only)
 # Used on pull requests and for the plan step on main.
 data "aws_iam_policy_document" "plan_trust" {
   statement {
@@ -59,8 +57,8 @@ data "aws_iam_policy_document" "plan_trust" {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
       values = [
-        "repo:${local.subject_repo}:pull_request",
-        "repo:${local.subject_repo}:ref:refs/heads/main",
+        "repo:${var.github_repo}:pull_request",
+        "repo:${var.github_repo}:ref:refs/heads/main",
       ]
     }
   }
@@ -94,7 +92,7 @@ data "aws_iam_policy_document" "apply_trust" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${local.subject_repo}:environment:production"]
+      values   = ["repo:${var.github_repo}:environment:production"]
     }
   }
 }
