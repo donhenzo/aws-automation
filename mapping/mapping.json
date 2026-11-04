@@ -38,6 +38,16 @@
         "session_duration": "PT8H",
         "managed_policies": ["arn:aws:iam::aws:policy/SecurityAudit"]
       }
+    },
+    {
+      "group": "AWS-IT-Admins",
+      "permission_set": {
+        "name": "Henz-IT-Admins",
+        "description": "Administrator access for the IT admin group. Managed by the henz-iga automation; do not edit by hand.",
+        "session_duration": "PT1H",
+        "justification": "Break-glass and platform administration of the lab workload account, used by the sole engineer. One hour sessions only.",
+        "managed_policies": ["arn:aws:iam::aws:policy/AdministratorAccess"]
+      }
     }
   ]
 }

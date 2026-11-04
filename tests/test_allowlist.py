@@ -54,7 +54,7 @@ def allow_problems(doc):
 
 def test_real_files_are_valid_together():
     mapping = load_checked_mapping(ROOT / "mapping" / "mapping.json", ROOT / "mapping" / "policy-allowlist.json")
-    assert len(mapping.mappings) == 3
+    assert len(mapping.mappings) == 4
 
 
 def test_real_allowlist_has_a_readme_that_explains_the_file():
