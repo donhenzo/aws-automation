@@ -23,6 +23,11 @@
       "tier": "privileged",
       "max_session_duration": "PT4H",
       "reason": "Lets engineers build and run workloads. Full access except managing IAM users and roles, so sessions are short and each rule must be justified."
+    },
+    "arn:aws:iam::aws:policy/AdministratorAccess": {
+      "tier": "privileged",
+      "max_session_duration": "PT2H",
+      "reason": "Full administrative access for the IT admin group, for break-glass and platform work. Shortest session of any policy, and each rule must be justified."
     }
   }
 }
