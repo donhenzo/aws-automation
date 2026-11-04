@@ -39,7 +39,7 @@ def problems_for(doc):
 
 def test_real_mapping_file_is_valid():
     mapping = load_mapping(REAL_FILE)
-    assert [m.group for m in mapping.mappings] == ["AWS-IT-ReadOnly", "AWS-IT-PowerUsers", "AWS-IT-Security"]
+    assert [m.group for m in mapping.mappings] == ["AWS-IT-ReadOnly", "AWS-IT-PowerUsers", "AWS-IT-Security", "AWS-IT-Admins"]
     assert mapping.mappings[0].permission_set_name == "Henz-IT-ReadOnly"
     assert mapping.watch_prefix == "AWS-IT-"
 
